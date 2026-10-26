@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Food Roulette</title>
+<meta name="theme-color" content="#0E1016">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="푸드룰렛">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #0E1016;
+    --surface: #161922;
+    --surface2: #1E2230;
+    --control: #272C3C;
+    --line: #2A2F3F;
+    --text: #E8EAF2;
+    --text-dim: #8A90A6;
+    --accent: #8E72FF;
+    --success: #4CC38A;
+    --warn: #FFB020;
+    --danger: #FF5C6C;
+    --accent-gradient: linear-gradient(135deg, #A084FF, #5B3DF5);
+    --font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    display: flex;
+    flex-direction: column;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  main {
+    flex: 1;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .page {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: calc(16px + env(safe-area-inset-top)) 20px 20px;
+  }
+  .eyebrow { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .02em; }
+  h1 { margin: 2px 0 0; font-size: 26px; font-weight: 700; }
+
+  /* 룰렛 (가로 폭에 맞춘 정사각형) */
+  .wheel-host { position: relative; margin-top: 8px; aspect-ratio: 1; }
+  /* 글로우가 잘리지 않도록 캔버스를 사방 20px 더 크게 */
+  .wheel-host canvas { position: absolute; inset: -20px; width: calc(100% + 40px); height: calc(100% + 40px); will-change: transform; }
+  .pointer {
+    position: absolute; left: 50%; top: 2px;
+    width: 32px; height: 46px; margin-left: -16px;
+    transform-origin: 50% 10%;
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .55));
+    pointer-events: none;
+  }
+  .pointer.tick { animation: tick 140ms cubic-bezier(.33, 1, .68, 1); }
+  @keyframes tick { from { transform: rotate(-16deg); } to { transform: rotate(0); } }
+  .spin {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, .25);
+    background: var(--accent-gradient);
+    color: #fff; font: 700 20px var(--font);
+    cursor: pointer; padding: 0;
+  }
+  .spin:active { filter: brightness(.9); }
+
+  /* 결과 */
+  .result { height: 78px; margin-top: 4px; text-align: center; transition: opacity 200ms; }
+  .result.pop { animation: pop 550ms cubic-bezier(.34, 1.56, .64, 1); }
+  @keyframes pop { from { opacity: 0; transform: scale(.6); } 55% { opacity: 1; } to { transform: scale(1); } }
+  .result-label { font-size: 14px; color: var(--text-dim); }
+  .result-name {
+    font-size: 28px; font-weight: 700; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* 편집 카드 */
+  .card {
+    margin-top: 8px; padding: 18px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 22px;
+  }
+  .card.locked { pointer-events: none; }
+  .count-row {
+    display: flex; align-items: center; gap: 0;
+    padding: 12px 16px; background: var(--surface2); border-radius: 16px;
+  }
+  .count-row .info { flex: 1; }
+  .title { font-size: 15px; font-weight: 700; }
+  .hint { font-size: 12px; color: var(--text-dim); }
+  .step {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--control); border: 1px solid var(--line);
+    color: var(--text); font: 24px var(--font); line-height: 1;
+    cursor: pointer; padding: 0;
+    transition: transform 90ms, opacity 150ms;
+  }
+  .step:active { transform: scale(.88); transition-duration: 60ms; }
+  .step:disabled { opacity: .35; }
+  .count { width: 56px; text-align: center; font-size: 24px; font-weight: 700; }
+  .list-head { display: flex; justify-content: space-between; align-items: flex-end; margin: 22px 2px 10px; }
+  .slots { display: flex; flex-direction: column; gap: 8px; }
+  .slot { display: flex; align-items: center; gap: 10px; }
+  .badge {
+    flex: none; width: 30px; height: 30px; border-radius: 15px;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; color: #fff;
+  }
+  .slot input {
+    flex: 1; min-width: 0; height: 48px; padding: 0 12px;
+    background: var(--surface2); border: 1px solid var(--line); border-radius: 12px;
+    color: var(--text);
+    /* 16px 미만이면 iOS Safari가 입력 시 화면을 확대함 */
+    font: 16px var(--font);
+    outline: none;
+    -webkit-user-select: text; user-select: text;
+  }
+  .slot input:focus { border-color: var(--accent); }
+  .slot input::placeholder { color: var(--text-dim); }
+
+  /* 하단 저장 바 */
+  footer {
+    flex: none;
+    background: var(--surface); border-top: 1px solid var(--line);
+    padding: 10px 20px calc(16px + env(safe-area-inset-bottom));
+  }
+  footer .inner { max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+  .status { font-size: 12px; }
+  .save {
+    height: 52px; border: 0; border-radius: 14px;
+    background: var(--accent-gradient); color: #fff;
+    font: 700 16px var(--font); cursor: pointer;
+  }
+  .save:active { filter: brightness(.9); }
+</style>
+</head>
+<body>
+<main>
+  <div class="page">
+    <div class="eyebrow">FOOD ROULETTE</div>
+    <h1>오늘 뭐 먹지?</h1>
+
+    <div class="wheel-host" id="wheelHost">
+      <canvas id="wheel"></canvas>
+      <svg class="pointer" id="pointer" viewBox="0 0 32 46" aria-hidden="true">
+        <polygon points="2,2 30,2 16,42" fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round" />
+      </svg>
+      <button class="spin" id="spin">SPIN</button>
+    </div>
+
+    <div class="result" id="result">
+      <div class="result-label" id="resultLabel">오늘 뭐 먹지?</div>
+      <div class="result-name" id="resultName">SPIN을 눌러 돌려보세요</div>
+    </div>
+
+    <section class="card" id="editor">
+      <div class="count-row">
+        <div class="info">
+          <div class="title">칸 개수</div>
+          <div class="hint" id="rangeText"></div>
+        </div>
+        <button class="step" id="minus" aria-label="칸 빼기">−</button>
+        <div class="count" id="count"></div>
+        <button class="step" id="plus" aria-label="칸 추가">+</button>
+      </div>
+
+      <div class="list-head">
+        <div class="title">메뉴 목록</div>
+        <div class="hint">칸마다 음식 이름 입력</div>
+      </div>
+
+      <div class="slots" id="slots"></div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <div class="status" id="status"></div>
+    <button class="save" id="save">저장하기</button>
+  </div>
+</footer>
+
+<script>
+const MIN_SLOTS = 2;
+const MAX_SLOTS = 20;
+const STORAGE_KEY = "menu_items";
+const DEFAULTS = ["김치찌개", "짜장면", "초밥", "피자", "햄버거", "떡볶이"];
+
+const PALETTE = [
+  "#7C5CFF", "#FF5C8A", "#22C3A6", "#FFB020", "#3D8BFF",
+  "#FF6B4A", "#A3D93F", "#C058F3", "#18B4E0", "#F25C9C",
+  "#4CC38A", "#FF8F3F", "#6C7BFF", "#E8C547", "#2BD4C4",
+  "#FF4D6D", "#9B6CFF", "#5BC0EB", "#F7A072", "#9BE564",
+];
+
+// + 버튼으로 칸을 추가할 때 채워 넣을 추천 메뉴
+const SUGGESTIONS = [
+  "김치찌개", "된장찌개", "짜장면", "짬뽕", "초밥", "피자", "햄버거", "치킨",
+  "떡볶이", "쌀국수", "돈까스", "비빔밥", "라멘", "파스타", "제육볶음", "국밥",
+  "냉면", "마라탕", "샐러드", "샌드위치", "부대찌개", "삼겹살", "칼국수", "카레",
+];
+
+const GLOW_PADDING = 14;
+const BLEED = 20; // CSS의 캔버스 확장 폭과 같아야 함
+const HUB_RATIO = 0.13; // SPIN 버튼 반지름 / 뷰 크기
+const LABEL_FONT = getComputedStyle(document.documentElement).getPropertyValue("--font");
+
+const $ = id => document.getElementById(id);
+const wheelHost = $("wheelHost"), canvas = $("wheel"), ctx = canvas.getContext("2d");
+const pointer = $("pointer"), spinButton = $("spin");
+const result = $("result"), resultLabel = $("resultLabel"), resultName = $("resultName");
+const editor = $("editor"), slotsEl = $("slots");
+const minusButton = $("minus"), plusButton = $("plus"), countText = $("count");
+const statusText = $("status");
+
+let names = [];
+let savedNames = [];
+let spinning = false;
+let rotation = 0;   // 휠 회전 각도 (시계방향, deg)
+let winner = -1;
+let dim = 0;
+let pointerSegment = -1;
+
+// ---------- 저장소 ----------
+
+// 줄바꿈 구분 문자열로 저장 (모바일 앱과 같은 형식)
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY) || "";
+    return raw.length === 0 ? [...DEFAULTS] : raw.split("\n");
+  } catch { return [...DEFAULTS]; }
+}
+
+function save() {
+  try {
+    const current = currentNames();
+    localStorage.setItem(STORAGE_KEY, current.join("\n"));
+    savedNames = current;
+    statusText.textContent = "✓ 저장되었습니다";
+    statusText.style.color = "var(--success)";
+  } catch (e) {
+    statusText.textContent = "저장 실패: " + e.message;
+    statusText.style.color = "var(--danger)";
+  }
+}
+
+// ---------- 칸 관리 ----------
+
+const currentNames = () => names.map(n => n.trim());
+const isDirty = () => currentNames().join("\n") !== savedNames.join("\n");
+const slotColor = i => PALETTE[i % PALETTE.length];
+const displayName = i => names[i].trim() || `메뉴 ${i + 1}`;
+
+function nextSuggestion() {
+  const used = new Set(currentNames());
+  return SUGGESTIONS.find(s => !used.has(s)) ?? `메뉴 ${names.length + 1}`;
+}
+
+function refreshSlots() {
+  slotsEl.replaceChildren(...names.map((name, i) => {
+    const row = document.createElement("div");
+    row.className = "slot";
+    const badge = document.createElement("div");
+    badge.className = "badge";
+    badge.style.background = slotColor(i);
+    badge.textContent = i + 1;
+    const input = document.createElement("input");
+    input.value = name;
+    input.maxLength = 20;
+    input.placeholder = "음식 이름";
+    input.enterKeyHint = "done";
+    input.addEventListener("input", () => { names[i] = input.value; onNamesChanged(); });
+    input.addEventListener("keydown", e => { if (e.key === "Enter") input.blur(); });
+    row.append(badge, input);
+    return row;
+  }));
+  countText.textContent = names.length;
+  minusButton.disabled = names.length <= MIN_SLOTS;
+  plusButton.disabled = names.length >= MAX_SLOTS;
+  onNamesChanged();
+}
+
+function onNamesChanged() {
+  winner = -1;
+  drawWheel();
+  updateStatus();
+}
+
+function updateStatus() {
+  if (isDirty()) {
+    statusText.textContent = "● 저장되지 않은 변경사항이 있어요";
+    statusText.style.color = "var(--warn)";
+  } else {
+    statusText.textContent = "✓ 저장된 상태";
+    statusText.style.color = "var(--success)";
+  }
+}
+
+plusButton.addEventListener("click", () => {
+  if (spinning || names.length >= MAX_SLOTS) return;
+  names.push(nextSuggestion());
+  refreshSlots();
+});
+
+minusButton.addEventListener("click", () => {
+  if (spinning || names.length <= MIN_SLOTS) return;
+  names.pop();
+  refreshSlots();
+});
+
+// ---------- 휠 그리기 ----------
+
+// 룰렛 영역을 화면 폭에 맞춘 정사각형으로 유지하고 SPIN 버튼 크기를 맞춤
+function resize() {
+  const size = wheelHost.clientWidth;
+  if (size <= 0) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.height = Math.round((size + BLEED * 2) * dpr);
+  const hub = Math.round(size * HUB_RATIO * 2) - 10;
+  spinButton.style.width = spinButton.style.height = hub + "px";
+  drawWheel();
+}
+new ResizeObserver(resize).observe(wheelHost);
+
+// 12시 방향 기준 시계방향 각도
+function pointAt(cx, cy, radius, deg) {
+  const rad = deg * Math.PI / 180;
+  return [cx + radius * Math.sin(rad), cy - radius * Math.cos(rad)];
+}
+
+function isLight(hex) {
+  const v = parseInt(hex.slice(1), 16);
+  return 0.299 * (v >> 16) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255) > 175;
+}
+
+const slotAlpha = i => winner >= 0 && i !== winner ? 1 - 0.7 * dim : 1;
+
+function fitLabel(text, width, size) {
+  const min = size * 0.7;
+  const measure = s => { ctx.font = `700 ${s}px ${LABEL_FONT}`; return ctx.measureText(text).width; };
+  while (size > min && measure(size) > width) size -= 1;
+  if (measure(size) <= width) return [text, size];
+  const chars = [...text];
+  for (let len = chars.length - 1; len > 0; len--) {
+    const cut = chars.slice(0, len).join("") + "…";
+    if (ctx.measureText(cut).width <= width) return [cut, size];
+  }
+  return ["…", size];
+}
+
+function drawWheel() {
+  const dpr = window.devicePixelRatio || 1;
+  const size = canvas.width / dpr - BLEED * 2;
+  if (size <= 0) return;
+  ctx.setTransform(dpr, 0, 0, dpr, BLEED * dpr, BLEED * dpr);
+  ctx.clearRect(-BLEED, -BLEED, size + BLEED * 2, size + BLEED * 2);
+
+  const cx = size / 2, cy = size / 2;
+  const outer = size / 2 - GLOW_PADDING;
+  const r = outer * 0.925;
+  const hub = size * HUB_RATIO;
+
+  // 바깥 링 + 보라색 글로우
+  ctx.save();
+  ctx.shadowColor = "rgba(124, 92, 255, .4)";
+  ctx.shadowBlur = 36;
+  ctx.fillStyle = "#1A1D28";
+  ctx.beginPath(); ctx.arc(cx, cy, outer, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // 링 위 장식 점
+  const dots = 24, dotR = (outer - r) * 0.22;
+  for (let i = 0; i < dots; i++) {
+    const [x, y] = pointAt(cx, cy, (outer + r) / 2, i * 360 / dots);
+    ctx.fillStyle = i % 2 === 0 ? "rgba(255, 255, 255, .8)" : "rgba(155, 132, 255, .33)";
+    ctx.beginPath(); ctx.arc(x, y, dotR, 0, Math.PI * 2); ctx.fill();
+  }
+
+  const n = names.length;
+  if (n === 0) return;
+  const sweep = 360 / n;
+  const toCanvasAngle = deg => (deg - 90) * Math.PI / 180;
+
+  // 칸
+  ctx.strokeStyle = "#14161F";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < n; i++) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, toCanvasAngle(i * sweep), toCanvasAngle((i + 1) * sweep));
+    ctx.closePath();
+    ctx.globalAlpha = slotAlpha(i);
+    ctx.fillStyle = slotColor(i);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.stroke();
+  }
+
+  // 가장자리 음영
+  const shade = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  shade.addColorStop(0.78, "rgba(0, 0, 0, 0)");
+  shade.addColorStop(1, "rgba(0, 0, 0, .25)");
+  ctx.fillStyle = shade;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+
+  // 라벨: 칸 가운데 각도로 회전, 왼쪽 절반은 뒤집히지 않도록 반대편에 놓고 180° 더 돌림
+  const labelStart = hub + r * 0.05;
+  const labelEnd = r * 0.94;
+  const labelWidth = labelEnd - labelStart;
+  const baseSize = r * (n <= 6 ? 0.1 : n <= 10 ? 0.085 : n <= 14 ? 0.072 : 0.062);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i < n; i++) {
+    const [text, fontSize] = fitLabel(displayName(i), labelWidth, baseSize);
+    const mid = (i + 0.5) * sweep;
+    const flip = mid > 180;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((flip ? mid + 90 : mid - 90) * Math.PI / 180);
+    ctx.font = `700 ${fontSize}px ${LABEL_FONT}`;
+    ctx.globalAlpha = slotAlpha(i);
+    ctx.fillStyle = isLight(slotColor(i)) ? "#14161F" : "#fff";
+    const x = flip ? -labelEnd + labelWidth / 2 : labelStart + labelWidth / 2;
+    ctx.fillText(text, x, 0);
+    ctx.restore();
+  }
+
+  // 허브 받침
+  ctx.fillStyle = "#0E1016";
+  ctx.beginPath(); ctx.arc(cx, cy, hub, 0, Math.PI * 2); ctx.fill();
+}
+
+// ---------- 진동 ----------
+
+// Android는 Vibration API, iOS(18+)는 switch 체크박스 토글 시 나는 햅틱을 이용
+const hapticSwitch = (() => {
+  const label = document.createElement("label");
+  label.style.display = "none";
+  label.setAttribute("aria-hidden", "true");
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.setAttribute("switch", "");
+  label.append(input);
+  document.body.append(label);
+  return label;
+})();
+
+function haptic(ms) {
+  try {
+    if (navigator.vibrate) navigator.vibrate(ms);
+    else hapticSwitch.click();
+  } catch { }
+}
+
+// ---------- 돌리기 ----------
+
+const quarticOut = t => 1 - Math.pow(1 - t, 4);
+const randomInt = (min, max) => min + Math.floor(Math.random() * (max - min));
+
+function animate(duration, easing, onFrame) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    const frame = now => {
+      const t = Math.min(1, (now - start) / duration);
+      onFrame(easing(t));
+      if (t < 1) requestAnimationFrame(frame); else resolve();
+    };
+    requestAnimationFrame(frame);
+  });
+}
+
+spinButton.addEventListener("click", async () => {
+  if (spinning) return;
+  spinning = true;
+  editor.classList.add("locked");
+  document.activeElement?.blur();
+
+  const n = names.length;
+  const sweep = 360 / n;
+  const win = randomInt(0, n);
+
+  // 당첨 칸 안의 임의 지점(경계 근처 제외)이 12시 포인터에 오도록 최종 각도 계산
+  const targetInWheel = (win + 0.15 + Math.random() * 0.7) * sweep;
+  const current = rotation;
+  const final = current - current % 360 + 360 * randomInt(6, 9) + (360 - targetInWheel);
+
+  winner = -1;
+  drawWheel();
+  result.classList.remove("pop");
+  result.style.opacity = 0.3;
+  resultLabel.textContent = "두구두구두구...";
+
+  pointerSegment = -1;
+  await animate(5000 + randomInt(0, 1500), quarticOut, t => {
+    rotation = current + (final - current) * t;
+    canvas.style.transform = `rotate(${rotation}deg)`;
+    onWheelMoved(rotation, sweep);
+  });
+  onSpinCompleted(win);
+});
+
+// 포인터가 칸 경계를 넘을 때마다 튕김 + 진동
+function onWheelMoved(angle, sweep) {
+  const underPointer = ((-angle) % 360 + 360) % 360;
+  const segment = Math.floor(underPointer / sweep);
+  if (segment === pointerSegment) return;
+  pointerSegment = segment;
+
+  pointer.classList.remove("tick");
+  void pointer.offsetWidth; // 애니메이션 재시작
+  pointer.classList.add("tick");
+  haptic(8);
+}
+
+function onSpinCompleted(win) {
+  spinning = false;
+  editor.classList.remove("locked");
+  haptic(40);
+
+  // 당첨 칸 외에는 어둡게
+  winner = win;
+  animate(400, t => t, t => { dim = t; drawWheel(); });
+
+  resultLabel.textContent = "오늘의 메뉴는";
+  resultName.textContent = displayName(win);
+  resultName.style.color = slotColor(win);
+  result.style.opacity = 1;
+  result.classList.add("pop");
+}
+
+// ---------- 시작 ----------
+
+$("save").addEventListener("click", save);
+$("rangeText").textContent = `${MIN_SLOTS} ~ ${MAX_SLOTS}칸`;
+
+names = load().slice(0, MAX_SLOTS);
+while (names.length < MIN_SLOTS) names.push(nextSuggestion());
+savedNames = currentNames();
+refreshSlots();
+document.fonts?.ready.then(drawWheel);
+
+window.addEventListener("beforeunload", e => { if (isDirty()) e.preventDefault(); });
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { });
+</script>
+</body>
+</html>

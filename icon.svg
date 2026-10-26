@@ -1,0 +1,17 @@
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+    <rect width="456" height="456" fill="#0E1016" />
+    <circle cx="228" cy="228" r="142" fill="#1A1D28" />
+    <g>
+        <path d="M228,228 L228,98 A130,130 0 0,1 319.92,136.08 Z" fill="#7C5CFF" />
+        <path d="M228,228 L228,98 A130,130 0 0,1 319.92,136.08 Z" fill="#FF5C8A" transform="rotate(45 228 228)" />
+        <path d="M228,228 L228,98 A130,130 0 0,1 319.92,136.08 Z" fill="#22C3A6" transform="rotate(90 228 228)" />
+        <path d="M228,228 L228,98 A130,130 0 0,1 319.92,136.08 Z" fill="#FFB020" transform="rotate(135 228 228)" />
+        <path d="M228,228 L228,98 A130,130 0 0,1 319.92,136.08 Z" fill="#3D8BFF" transform="rotate(180 228 228)" />
+        <path d="M228,228 L228,98 A130,130 0 0,1 319.92,136.08 Z" fill="#FF6B4A" transform="rotate(225 228 228)" />
+        <path d="M228,228 L228,98 A130,130 0 0,1 319.92,136.08 Z" fill="#A3D93F" transform="rotate(270 228 228)" />
+        <path d="M228,228 L228,98 A130,130 0 0,1 319.92,136.08 Z" fill="#C058F3" transform="rotate(315 228 228)" />
+    </g>
+    <circle cx="228" cy="228" r="40" fill="#0E1016" />
+    <circle cx="228" cy="228" r="31" fill="#8E72FF" />
+    <path d="M206,76 L250,76 L228,124 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round" />
+</svg>
